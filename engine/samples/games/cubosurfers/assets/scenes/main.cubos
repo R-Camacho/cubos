@@ -24,6 +24,8 @@
                 "z": 2.0
             },
             "cubos::engine::Collider": {},
+            "cubos::engine::CollisionLayers": 1,
+            "cubos::engine::CollisionMask": 1,
             "Player": {
                 "speed": 5,
                 "laneWidth": 9

@@ -10,6 +10,7 @@
 #include <cubos/engine/utils/free_camera/plugin.hpp>
 #include <cubos/engine/voxels/plugin.hpp>
 
+#include "cubos/engine/collisions/plugin.hpp"
 #include "obstacle.hpp"
 #include "player.hpp"
 #include "spawner.hpp"
@@ -19,6 +20,8 @@ using namespace cubos::engine;
 static const Asset<Scene> SceneAsset = AnyAsset("/assets/scenes/main.cubos");
 static const Asset<VoxelPalette> PaletteAsset = AnyAsset("/assets/main.pal");
 static const Asset<InputBindings> InputBindingsAsset = AnyAsset("/assets/input.bind");
+
+static void restartGame(Commands& cmds, const Assets& assets, Query<Entity> all);
 
 int main(int argc, char** argv)
 {
@@ -52,23 +55,30 @@ int main(int argc, char** argv)
         .call([](Commands cmds, const Assets& assets, const Input& input, Query<Entity> all) {
             if (input.justPressed("restart"))
             {
-                for (auto [ent] : all)
-                {
-                    cmds.destroy(ent);
-                }
-
-                cmds.spawn(assets.read(SceneAsset)->blueprint);
+                restartGame(cmds, assets, all);
             }
         });
 
     cubos.system("detect player vs obstacle collisions")
-        .call([](Query<const Player&, const CollidingWith&, const Obstacle&> collisions) {
+        .call([](Query<const Player&, const CollidingWith&, const Obstacle&> collisions, Commands cmds,
+                 const Assets& assets, Query<Entity> all) {
             for (auto [player, collidingWith, obstacle] : collisions)
             {
-                CUBOS_INFO("Player collided with an obstacle!");
+                CUBOS_WARN("Player collided with an obstacle!");
                 (void)player; // here to shut up 'unused variable warning', you can remove it
+                restartGame(cmds, assets, all);
             }
         });
 
     cubos.run();
+}
+
+static void restartGame(Commands& cmds, const Assets& assets, Query<Entity> all)
+{
+    for (auto [ent] : all)
+    {
+        cmds.destroy(ent);
+    }
+
+    cmds.spawn(assets.read(SceneAsset)->blueprint);
 }
