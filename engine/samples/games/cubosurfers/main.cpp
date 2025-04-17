@@ -1,4 +1,6 @@
+#include <cmath>
 #include <glm/common.hpp>
+#include <imgui.h>
 
 #include <cubos/engine/assets/plugin.hpp>
 #include <cubos/engine/collisions/colliding_with.hpp>
@@ -13,6 +15,8 @@
 #include <cubos/engine/voxels/plugin.hpp>
 
 #include "cubos/core/tel/logging.hpp"
+#include "cubos/engine/imgui/plugin.hpp"
+#include "cubos/engine/prelude.hpp"
 #include "obstacle.hpp"
 #include "player.hpp"
 #include "spawner.hpp"
@@ -22,6 +26,8 @@ using namespace cubos::engine;
 static const Asset<Scene> SceneAsset = AnyAsset("/assets/scenes/main.cubos");
 static const Asset<VoxelPalette> PaletteAsset = AnyAsset("/assets/main.pal");
 static const Asset<InputBindings> InputBindingsAsset = AnyAsset("/assets/input.bind");
+
+static float score = 0;
 
 static void restartGame(Commands& cmds, const Assets& assets, DeltaTime& dt, Query<Entity> all);
 
@@ -79,6 +85,17 @@ int main(int argc, char** argv)
         dt.scale = glm::clamp(dt.scale, 1.0F, maxScale);
     });
 
+    cubos.system("update and show score on an ImGui window").tagged(imguiTag).call([](const DeltaTime& dt) {
+        // Update score
+        score += dt.value();
+
+        ImGui::Begin("Score");
+        ImGui::Text("%d", (int)score);
+        ImGui::End();
+
+
+    });
+
     cubos.run();
 }
 
@@ -86,6 +103,7 @@ static void restartGame(Commands& cmds, const Assets& assets, DeltaTime& dt, Que
 {
     CUBOS_INFO("Restarting Game!");
     dt.scale = 1.0F;
+    score = 0;
     for (auto [ent] : all)
     {
         cmds.destroy(ent);
