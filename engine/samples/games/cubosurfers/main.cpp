@@ -1,3 +1,5 @@
+#include <glm/common.hpp>
+
 #include <cubos/engine/assets/plugin.hpp>
 #include <cubos/engine/collisions/colliding_with.hpp>
 #include <cubos/engine/defaults/plugin.hpp>
@@ -10,7 +12,7 @@
 #include <cubos/engine/utils/free_camera/plugin.hpp>
 #include <cubos/engine/voxels/plugin.hpp>
 
-#include "cubos/engine/collisions/plugin.hpp"
+#include "cubos/core/tel/logging.hpp"
 #include "obstacle.hpp"
 #include "player.hpp"
 #include "spawner.hpp"
@@ -21,7 +23,7 @@ static const Asset<Scene> SceneAsset = AnyAsset("/assets/scenes/main.cubos");
 static const Asset<VoxelPalette> PaletteAsset = AnyAsset("/assets/main.pal");
 static const Asset<InputBindings> InputBindingsAsset = AnyAsset("/assets/input.bind");
 
-static void restartGame(Commands& cmds, const Assets& assets, Query<Entity> all);
+static void restartGame(Commands& cmds, const Assets& assets, DeltaTime& dt, Query<Entity> all);
 
 int main(int argc, char** argv)
 {
@@ -52,29 +54,38 @@ int main(int argc, char** argv)
         });
 
     cubos.system("restart the game on input")
-        .call([](Commands cmds, const Assets& assets, const Input& input, Query<Entity> all) {
+        .call([](Commands cmds, const Assets& assets, DeltaTime& dt, const Input& input, Query<Entity> all) {
             if (input.justPressed("restart"))
             {
-                restartGame(cmds, assets, all);
+                restartGame(cmds, assets, dt, all);
             }
         });
 
     cubos.system("detect player vs obstacle collisions")
         .call([](Query<const Player&, const CollidingWith&, const Obstacle&> collisions, Commands cmds,
-                 const Assets& assets, Query<Entity> all) {
+                 const Assets& assets, DeltaTime& dt, Query<Entity> all) {
             for (auto [player, collidingWith, obstacle] : collisions)
             {
-                CUBOS_WARN("Player collided with an obstacle!");
+                CUBOS_INFO("Player collided with an obstacle!");
                 (void)player; // here to shut up 'unused variable warning', you can remove it
-                restartGame(cmds, assets, all);
+                restartGame(cmds, assets, dt, all);
             }
         });
+
+    cubos.system("speedup the game gradually").call([](DeltaTime& dt) {
+        const float growthRate = 0.02F;
+        const float maxScale = 2.6F;
+        dt.scale *= (1 + growthRate * dt.value()); // % increase per second
+        dt.scale = glm::clamp(dt.scale, 1.0F, maxScale);
+    });
 
     cubos.run();
 }
 
-static void restartGame(Commands& cmds, const Assets& assets, Query<Entity> all)
+static void restartGame(Commands& cmds, const Assets& assets, DeltaTime& dt, Query<Entity> all)
 {
+    CUBOS_INFO("Restarting Game!");
+    dt.scale = 1.0F;
     for (auto [ent] : all)
     {
         cmds.destroy(ent);
