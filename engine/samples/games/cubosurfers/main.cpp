@@ -1,4 +1,3 @@
-#include <cmath>
 #include <glm/common.hpp>
 #include <imgui.h>
 
@@ -14,6 +13,7 @@
 #include <cubos/engine/utils/free_camera/plugin.hpp>
 #include <cubos/engine/voxels/plugin.hpp>
 
+#include "armour.hpp"
 #include "cubos/core/tel/logging.hpp"
 #include "cubos/engine/imgui/plugin.hpp"
 #include "cubos/engine/prelude.hpp"
@@ -40,6 +40,7 @@ int main(int argc, char** argv)
     cubos.plugin(toolsPlugin);
     cubos.plugin(spawnerPlugin);
     cubos.plugin(obstaclePlugin);
+    cubos.plugin(armourPlugin);
     cubos.plugin(playerPlugin);
 
     cubos.startupSystem("configure settings").before(settingsTag).call([](Settings& settings) {
@@ -68,13 +69,26 @@ int main(int argc, char** argv)
         });
 
     cubos.system("detect player vs obstacle collisions")
-        .call([](Query<const Player&, const CollidingWith&, const Obstacle&> collisions, Commands cmds,
-                 const Assets& assets, DeltaTime& dt, Query<Entity> all) {
-            for (auto [player, collidingWith, obstacle] : collisions)
+        .call([](Query<Player&, const CollidingWith&, const Obstacle&, Entity> collisions, Commands cmds, const Assets& assets,
+                 DeltaTime& dt, Query<Entity> all) {
+            for (auto [player, collidingWith, obstacle, ent] : collisions)
             {
                 CUBOS_INFO("Player collided with an obstacle!");
-                (void)player; // here to shut up 'unused variable warning', you can remove it
-                restartGame(cmds, assets, dt, all);
+
+                if (player.armoured)
+                {
+                    CUBOS_INFO("Player is armoured and will not take damage");
+                    player.armoured = false;
+                    
+                    // Destroy the obstacle to avoid multiple collisions
+                    cmds.destroy(ent);
+                    
+                }
+                else
+                {
+                    CUBOS_INFO("Restarting game!");
+                    restartGame(cmds, assets, dt, all);
+                }
             }
         });
 
@@ -89,12 +103,21 @@ int main(int argc, char** argv)
         // Update score
         score += dt.value();
 
+        // ImGui Window
         ImGui::Begin("Score");
         ImGui::Text("%d", (int)score);
         ImGui::End();
-
-
     });
+    
+    cubos.system("detect player vs armour collisions")
+        .call([](Commands cmds, Query<Player&, const CollidingWith&, const Armour&, Entity> collisions) {
+            for (auto [player, collidingWith, armour, ent] : collisions)
+            {
+                CUBOS_INFO("Player collided with an armour power-up!");
+                player.armoured = true;
+                cmds.destroy(ent);
+            }
+        });
 
     cubos.run();
 }

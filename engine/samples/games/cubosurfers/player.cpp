@@ -13,6 +13,7 @@ CUBOS_REFLECT_IMPL(Player)
     return cubos::core::ecs::TypeBuilder<Player>("Player")
         .withField("speed", &Player::speed)
         .withField("laneWidth", &Player::laneWidth)
+        .withField("armoured", &Player::armoured)
         .build();
 }
 

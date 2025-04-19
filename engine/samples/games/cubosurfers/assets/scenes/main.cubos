@@ -28,7 +28,8 @@
             "cubos::engine::CollisionMask": 1,
             "Player": {
                 "speed": 5,
-                "laneWidth": 9
+                "laneWidth": 9,
+                "armoured": true
             }
         },
         "track1": {
@@ -73,6 +74,19 @@
                 "scene": "b15272c5-08c9-47f5-9b24-1192332580a8",
                 "sceneRoot": "base",
                 "period": 1.0,
+                "laneWidth": 9
+            }
+        },
+        "armour-spawner": {
+            "cubos::engine::Position": {
+                "x": 0,
+                "y": 0,
+                "z": 300
+            },
+            "Spawner": {
+                "scene": "e025bf8a-bf0d-4d4f-9df3-0fa303346f20", 
+                "sceneRoot": "base",
+                "period": 4.35,
                 "laneWidth": 9
             }
         },
