@@ -17,6 +17,7 @@
 #include "cubos/core/tel/logging.hpp"
 #include "cubos/engine/imgui/plugin.hpp"
 #include "cubos/engine/prelude.hpp"
+#include "jetpack.hpp"
 #include "obstacle.hpp"
 #include "player.hpp"
 #include "spawner.hpp"
@@ -41,6 +42,7 @@ int main(int argc, char** argv)
     cubos.plugin(spawnerPlugin);
     cubos.plugin(obstaclePlugin);
     cubos.plugin(armourPlugin);
+    cubos.plugin(jetpackPlugin);
     cubos.plugin(playerPlugin);
 
     cubos.startupSystem("configure settings").before(settingsTag).call([](Settings& settings) {
@@ -69,20 +71,25 @@ int main(int argc, char** argv)
         });
 
     cubos.system("detect player vs obstacle collisions")
-        .call([](Query<Player&, const CollidingWith&, const Obstacle&, Entity> collisions, Commands cmds, const Assets& assets,
-                 DeltaTime& dt, Query<Entity> all) {
+        .call([](Query<Player&, const CollidingWith&, const Obstacle&, Entity> collisions, Commands cmds,
+                 const Assets& assets, DeltaTime& dt, Query<Entity> all) {
             for (auto [player, collidingWith, obstacle, ent] : collisions)
             {
+                if (player.hasJetpack)
+                {
+                    // Avoid obstacles that are right behind a jetpack power-up
+                    continue;
+                }
+
                 CUBOS_INFO("Player collided with an obstacle!");
 
                 if (player.armoured)
                 {
                     CUBOS_INFO("Player is armoured and will not take damage");
                     player.armoured = false;
-                    
+
                     // Destroy the obstacle to avoid multiple collisions
                     cmds.destroy(ent);
-                    
                 }
                 else
                 {
@@ -108,13 +115,30 @@ int main(int argc, char** argv)
         ImGui::Text("%d", (int)score);
         ImGui::End();
     });
-    
+
     cubos.system("detect player vs armour collisions")
         .call([](Commands cmds, Query<Player&, const CollidingWith&, const Armour&, Entity> collisions) {
             for (auto [player, collidingWith, armour, ent] : collisions)
             {
                 CUBOS_INFO("Player collided with an armour power-up!");
                 player.armoured = true;
+
+                // Destroy armour entity
+                cmds.destroy(ent);
+            }
+        });
+
+    cubos.system("detect player vs jetpack collisions")
+        .call([](Commands cmds, Query<Player&, const CollidingWith&, const Jetpack&, Entity> collisions) {
+            for (auto [player, collidingWith, jetpack, ent] : collisions)
+            {
+                CUBOS_INFO("Player collided with a jetpack power-up!");
+
+                player.hasJetpack = true;
+                player.jetpackTimer = player.jetpackDuration;
+                player.targetY = player.jetpackHeight;
+
+                // Destroy jetpack entity
                 cmds.destroy(ent);
             }
         });

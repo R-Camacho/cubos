@@ -1,4 +1,5 @@
 #include "player.hpp"
+#include <glm/ext/quaternion_common.hpp>
 
 #include <cubos/core/ecs/reflection.hpp>
 #include <cubos/core/reflection/external/primitives.hpp>
@@ -14,6 +15,12 @@ CUBOS_REFLECT_IMPL(Player)
         .withField("speed", &Player::speed)
         .withField("laneWidth", &Player::laneWidth)
         .withField("armoured", &Player::armoured)
+        .withField("hasJetpack", &Player::hasJetpack)
+        .withField("jetpackTimer", &Player::jetpackTimer)
+        .withField("jetpackDuration", &Player::jetpackDuration)
+        .withField("targetY", &Player::targetY)
+        .withField("jetpackHeight", &Player::jetpackHeight)
+        .withField("verticalSpeed", &Player::verticalSpeed)
         .build();
 }
 
@@ -27,6 +34,28 @@ void playerPlugin(Cubos& cubos)
     cubos.system("move player").call([](Input& input, const DeltaTime& dt, Query<Player&, Position&> players) {
         for (auto [player, position] : players)
         {
+            if (player.hasJetpack)
+            {
+                player.jetpackTimer -= dt.value();
+
+                if (player.jetpackTimer <= 0.0F)
+                {
+                    // Timer expired
+                    CUBOS_INFO("Jetpack expired");
+                    player.hasJetpack = false;
+                    player.targetY = 0.0F;
+                }
+                else
+                {
+                    player.targetY = player.jetpackHeight;
+                }
+            }
+            else
+            {
+                // Not jetpacking
+                player.targetY = 0.0F;
+            }
+
             if (input.pressed("left") && player.lane == player.targetLane)
             {
                 player.targetLane = glm::clamp(player.lane - 1, -1, 1);
@@ -44,17 +73,27 @@ void playerPlugin(Cubos& cubos)
                 float currentT = (position.vec.x - sourceX) / (targetX - sourceX);
                 float newT = glm::min(1.0F, currentT + dt.value() * player.speed);
                 position.vec.x = glm::mix(sourceX, targetX, newT);
-                position.vec.y = glm::sin(currentT * glm::pi<float>()) * 2.0F;
 
-                if (newT == 1.0F)
+                if (!player.hasJetpack)
+                {
+                    player.targetY = glm::sin(currentT * glm::pi<float>()) * 2.0F;
+                }
+
+                if (newT >= 1.0F)
                 {
                     player.lane = player.targetLane;
+
+                    if (!player.hasJetpack)
+                    {
+                        player.targetY = 0.0F;
+                    }
                 }
             }
-            else
-            {
-                position.vec.y = 0;
-            }
+
+            // Interpolate between current Y and target Y
+            position.vec.y = glm::mix(position.vec.y, player.targetY, dt.value() * player.verticalSpeed);
+
+
         }
     });
 }
