@@ -1,10 +1,13 @@
 #include "player.hpp"
-#include <glm/ext/quaternion_common.hpp>
 
 #include <cubos/core/ecs/reflection.hpp>
 #include <cubos/core/reflection/external/primitives.hpp>
 
+#include <cubos/engine/assets/plugin.hpp>
 #include <cubos/engine/input/plugin.hpp>
+#include <cubos/engine/render/voxels/grid.hpp>
+#include <cubos/engine/render/voxels/load.hpp>
+#include <cubos/engine/render/voxels/plugin.hpp>
 #include <cubos/engine/transform/plugin.hpp>
 
 using namespace cubos::engine;
@@ -24,10 +27,15 @@ CUBOS_REFLECT_IMPL(Player)
         .build();
 }
 
+static const Asset<VoxelGrid> BasePlayerAsset = AnyAsset("57d1b886-8543-4b8b-8f78-d911e9c4f896");
+static const Asset<VoxelGrid> JetpackPlayerAsset = AnyAsset("c7263b46-be18-47c2-b3ef-05592b2e9dec");
+static const Asset<VoxelGrid> ShieldPlayerAsset = AnyAsset("4892c2f3-10b3-4ca7-9de3-822b77a0ba7e");
+
 void playerPlugin(Cubos& cubos)
 {
     cubos.depends(inputPlugin);
     cubos.depends(transformPlugin);
+    cubos.depends(renderVoxelsPlugin);
 
     cubos.component<Player>();
 
@@ -92,8 +100,33 @@ void playerPlugin(Cubos& cubos)
 
             // Interpolate between current Y and target Y
             position.vec.y = glm::mix(position.vec.y, player.targetY, dt.value() * player.verticalSpeed);
+        }
+    });
 
+    cubos.system("update player model").call([](Commands cmds, Query<Entity, const Player&, RenderVoxelGrid&> players) {
+        for (auto [ent, player, renderGrid] : players)
+        {
+            Asset<VoxelGrid> targetAsset = renderGrid.asset;
+            if (player.hasJetpack)
+            {
+                targetAsset = JetpackPlayerAsset;
+            }
+            else if (player.armoured)
+            {
+                targetAsset = ShieldPlayerAsset;
+            }
+            else
+            {
+                targetAsset = BasePlayerAsset;
+            }
 
+            // Only change the asset if needed
+            if (targetAsset != renderGrid.asset)
+            {
+                renderGrid.asset = targetAsset;
+                CUBOS_INFO("Player model updated to {}", targetAsset);
+                cmds.add(ent, LoadRenderVoxels{});
+            }
         }
     });
 }
